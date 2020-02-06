@@ -610,6 +610,7 @@ SELECT *, ROW_NUMBER() OVER (PARTITION BY Sexo ORDER BY ClienteId) Id
 FROM Clientes; 
 
 --Funciones de clasificacion 
+
 SELECT a.*,
 ROW_NUMBER() OVER (ORDER BY Total DESC) AS RowNumber,
 RANK() OVER (ORDER BY Total DESC) AS rRank,
@@ -621,3 +622,4 @@ FROM Facturas a INNER JOIN Clientes c ON a.ClienteId = c.ClienteId
 INNER JOIN (SELECT  FacturaId, SUM(Cantidad * PrecioVenta) Total
 FROM FacturasDetalle GROUP BY FacturaId) b ON a.FacturaId = b.FacturaId
 GROUP BY a.ClienteId, c.Nombre)a
+--ssss
