@@ -512,15 +512,112 @@ SELECT * FROM Clientes
 SELECT b.name Tabla, * FROM sys.triggers a INNER JOIN sys.tables b 
 ON a.parent_id = b.object_id
 
---Trigger de instead of 
 
-CREATE TRIGGER tbClientesActualizar ON Clientes 
-INSTEAD OF UPDATE 
+--Creacion de trigger 
+
+CREATE TRIGGER tgTablasVirtuales
+on Clientes 
+AFTER INSERT, UPDATE, DELETE 
 AS 
 BEGIN 
-	IF UPDATE(nombre)
+	SELECT * FROM inserted
+	SELECT * FROM deleted
+END
+
+INSERT INTO Clientes VALUES (312312, 'Cliente312312', 'M', 1, 000102312322);
+DELETE FROM Clientes WHERE ClienteId = 312312;
+UPDATE Clientes SET Nombre = 'Felix Junior Perez Peguero', Sexo = 'M' WHERE ClienteId = 1
+
+SELECT * FROM Clientes 
+
+--Encontrar los triggers 
+
+SELECT b.name Tabla, * FROM sys.triggers a INNER JOIN sys.tables b 
+ON a.parent_id = b.object_id
+
+--Triggers
+CREATE TRIGGER tg_ClientesCedula
+ON Clientes 
+AFTER UPDATE
+AS
+BEGIN 
+
+if update(cedula) 
+begin
+	
+	INSERT INTO HistorialdeCambios
+
+	SELECT 'Clientes', a.ClienteId, 'Cedula', b.Cedula, a.Cedula, SYSTEM_USER, GETDATE() FROM inserted a Inner join deleted b ON a.ClienteId = b.ClienteId
+
+end
+
+END
+
+UPDATE Clientes SET Cedula = '123456789' WHERE ClienteId = 1
+Select * from HistorialdeCambios
+
+
+-- t
+CREATE TRIGGER tg_FacturasEstados 
+ON Facturas 
+AFTER UPDATE 
+AS 
+BEGIN 
+
+	IF UPDATE(Fecha)
+	BEGIN 
+	INSERT INTO HistorialdeCambios
+
+	SELECT 'Facturas', a.FacturaId, 'Fecha', b.Fecha, a.Fecha, SYSTEM_USER, GETDATE() FROM inserted a INNER JOIN deleted b 
+	ON a.FacturaId = b.FacturaId
+
+	END
+
+	IF UPDATE(EstadoId)
 	BEGIN
-		IF NOT EXISTS
-		(
-			SELECT * FROM inserted s 
-		)
+	INSERT INTO HistorialdeCambios
+
+	SELECT 'Facturas', a.FacturaId, 'Estado', b.EstadoId, a.EstadoId, SYSTEM_USER, GETDATE() FROM inserted a INNER JOIN deleted b
+	ON a.FacturaId = b.FacturaId
+
+	END
+END
+
+UPDATE Facturas SET EstadoId = 2 WHERE FacturaId = 3
+
+UPDATE Facturas SET Fecha = '2019-08-23' WHERE FacturaId = 3 
+
+--Trigger Detalle facturas 
+CREATE TRIGGER tg_DetalleFacturaInstead
+ON FacturasDetalle 
+INSTEAD OF INSERT 
+AS 
+BEGIN
+	IF (SELECT ProductoId FROM inserted) NOT IN (SELECT ProductoId FROM Productos)
+	BEGIN
+		RAISERROR('Se ha detectado una amenaza',16,1);
+	END
+	ELSE 
+	BEGIN
+	INSERT INTO FacturasDetalle 
+	SELECT * FROM inserted
+	END
+END
+
+
+--ROW_COUNT
+SELECT *, ROW_NUMBER() OVER (PARTITION BY Sexo ORDER BY ClienteId) Id 
+FROM Clientes; 
+
+--Funciones de clasificacion 
+SELECT a.*,
+ROW_NUMBER() OVER (ORDER BY Total DESC) AS RowNumber,
+RANK() OVER (ORDER BY Total DESC) AS rRank,
+DENSE_RANK() OVER (ORDER BY Total DESC) AS DenseRank,
+NTILE(4) OVER (ORDER BY Total DESC) AS aNTILE
+FROM 
+(SELECT a.ClienteId, c.Nombre, SUM(Total) Total
+FROM Facturas a INNER JOIN Clientes c ON a.ClienteId = c.ClienteId
+INNER JOIN (SELECT  FacturaId, SUM(Cantidad * PrecioVenta) Total
+FROM FacturasDetalle GROUP BY FacturaId) b ON a.FacturaId = b.FacturaId
+GROUP BY a.ClienteId, c.Nombre)a
